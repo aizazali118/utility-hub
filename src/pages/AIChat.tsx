@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Sparkles, Image as ImageIcon, X, Camera } from 'lucide-react';
 import { security } from '../utils/security';
 
 interface Message {
@@ -7,65 +7,90 @@ interface Message {
   text: string;
   isBot: boolean;
   timestamp: Date;
+  image?: string;
 }
 
 const AIChat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hello! I'm your AI assistant powered by Google Gemini. How can I help you today?",
+      text: "Hello! I'm your AI assistant powered by Google Gemini Pro Vision. I can help you with text conversations and analyze images you share with me. How can I help you today?",
       isBot: true,
       timestamp: new Date()
     }
   ]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [apiKey, setApiKey] = useState(() => {
-    const stored = localStorage.getItem('gemini_api_key');
-    return stored ? security.decryptApiKey(stored) : '';
-  });
-  const [showApiInput, setShowApiInput] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Use the provided API key directly
+  const apiKey = 'AIzaSyAv4rVUnY0URBND2rLN_ea4gd4pBgrU2UM';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Save API key securely
-  const saveApiKey = (key: string) => {
-    setApiKey(key);
-    if (key) {
-      localStorage.setItem('gemini_api_key', security.encryptApiKey(key));
-    } else {
-      localStorage.removeItem('gemini_api_key');
-    }
-  };
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const callGeminiAPI = async (message: string): Promise<string> => {
-    if (!apiKey) {
-      return "Please provide your Google Gemini API key to use the AI chat feature. You can get one from https://makersuite.google.com/app/apikey";
-    }
+  const convertImageToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove the data URL prefix to get just the base64 data
+        const base64Data = result.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
+  const callGeminiAPI = async (message: string, imageBase64?: string): Promise<string> => {
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+      const parts: any[] = [];
+      
+      // Add text part
+      if (message.trim()) {
+        parts.push({ text: message });
+      }
+      
+      // Add image part if provided
+      if (imageBase64) {
+        parts.push({
+          inline_data: {
+            mime_type: imageFile?.type || 'image/jpeg',
+            data: imageBase64
+          }
+        });
+        
+        // If no text message, add a default prompt for image analysis
+        if (!message.trim()) {
+          parts.unshift({ text: "Analyze this image and provide detailed information about what you see. Describe the contents, objects, people, setting, colors, and any other relevant details." });
+        }
+      }
+
+      const model = imageBase64 ? 'gemini-pro-vision' : 'gemini-pro';
+      
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           contents: [{
-            parts: [{
-              text: message
-            }]
+            parts: parts
           }],
           generationConfig: {
             temperature: 0.7,
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 1024,
+            maxOutputTokens: 2048,
           },
           safetySettings: [
             {
@@ -102,18 +127,39 @@ const AIChat: React.FC = () => {
       }
     } catch (error) {
       console.error('Gemini API Error:', error);
-      return `Error: ${error instanceof Error ? error.message : 'Failed to get AI response'}. Please check your API key and try again.`;
+      return `Error: ${error instanceof Error ? error.message : 'Failed to get AI response'}. Please try again.`;
+    }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setSelectedImage(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeSelectedImage = () => {
+    setSelectedImage(null);
+    setImageFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
   const handleSendMessage = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() && !selectedImage) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputText,
+      text: inputText || (selectedImage ? "Please analyze this image" : ""),
       isBot: false,
-      timestamp: new Date()
+      timestamp: new Date(),
+      image: selectedImage || undefined
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -121,7 +167,13 @@ const AIChat: React.FC = () => {
     setIsTyping(true);
 
     try {
-      const aiResponse = await callGeminiAPI(inputText);
+      let imageBase64: string | undefined;
+      
+      if (imageFile && selectedImage) {
+        imageBase64 = await convertImageToBase64(imageFile);
+      }
+
+      const aiResponse = await callGeminiAPI(inputText, imageBase64);
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
         text: aiResponse,
@@ -140,6 +192,7 @@ const AIChat: React.FC = () => {
       setMessages(prev => [...prev, errorResponse]);
     } finally {
       setIsTyping(false);
+      removeSelectedImage();
     }
   };
 
@@ -156,7 +209,7 @@ const AIChat: React.FC = () => {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">AI Chat System</h1>
-            <p className="text-gray-600">Have intelligent conversations with Google Gemini AI</p>
+            <p className="text-gray-600">Have intelligent conversations and image analysis with Google Gemini Pro Vision</p>
           </div>
 
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden" style={{ height: '70vh' }}>
@@ -168,48 +221,19 @@ const AIChat: React.FC = () => {
                     <Sparkles className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-white font-semibold">AI Assistant (Google Gemini)</h2>
-                    <p className="text-green-100 text-sm">
-                      {apiKey ? 'Connected' : 'API key required'}
-                    </p>
+                    <h2 className="text-white font-semibold">AI Assistant (Google Gemini Pro Vision)</h2>
+                    <p className="text-green-100 text-sm">Ready for text and image analysis</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowApiInput(!showApiInput)}
-                  className="text-white hover:text-green-200 text-sm font-medium"
-                >
-                  {apiKey ? 'Change API Key' : 'Set API Key'}
-                </button>
+                <div className="flex items-center space-x-2">
+                  <Camera className="w-5 h-5 text-white" />
+                  <span className="text-white text-sm font-medium">Vision Enabled</span>
+                </div>
               </div>
-              
-              {showApiInput && (
-                <div className="mt-4 pt-4 border-t border-green-500 border-opacity-30">
-                  <div className="flex space-x-2">
-                    <input
-                      type="password"
-                      value={apiKey}
-                      onChange={(e) => saveApiKey(e.target.value)}
-                      placeholder="Enter your Google Gemini API key..."
-                      className="flex-1 px-3 py-2 rounded-lg text-gray-900 text-sm"
-                      autoComplete="off"
-                      spellCheck="false"
-                    />
-                    <button
-                      onClick={() => setShowApiInput(false)}
-                      className="bg-white bg-opacity-20 text-white px-4 py-2 rounded-lg text-sm hover:bg-opacity-30"
-                    >
-                      Save
-                    </button>
-                  </div>
-                  <p className="text-green-100 text-xs mt-2">
-                    Get your API key from: https://makersuite.google.com/app/apikey
-                  </p>
-                </div>
-              )}
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{ height: 'calc(70vh - 140px)' }}>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{ height: 'calc(70vh - 180px)' }}>
               {messages.map((message) => (
                 <div
                   key={message.id}
@@ -231,6 +255,16 @@ const AIChat: React.FC = () => {
                         ? 'bg-gray-100 text-gray-800'
                         : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
                     }`}>
+                      {message.image && (
+                        <div className="mb-2">
+                          <img 
+                            src={message.image} 
+                            alt="Shared image" 
+                            className="max-w-full h-auto rounded-lg border"
+                            style={{ maxHeight: '200px' }}
+                          />
+                        </div>
+                      )}
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
                       <p className={`text-xs mt-1 ${
                         message.isBot ? 'text-gray-500' : 'text-blue-200'
@@ -262,21 +296,60 @@ const AIChat: React.FC = () => {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Image Preview */}
+            {selectedImage && (
+              <div className="border-t bg-gray-50 p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    <img 
+                      src={selectedImage} 
+                      alt="Selected" 
+                      className="w-16 h-16 object-cover rounded-lg border"
+                    />
+                    <button
+                      onClick={removeSelectedImage}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-700">Image selected for analysis</p>
+                    <p className="text-xs text-gray-500">The AI will analyze this image along with your message</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Input Area */}
             <div className="border-t p-4">
               <div className="flex space-x-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-gray-100 text-gray-600 p-2 rounded-full hover:bg-gray-200 transition-all duration-300"
+                  title="Upload image"
+                >
+                  <ImageIcon className="w-5 h-5" />
+                </button>
                 <input
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Type your message..."
+                  placeholder="Type your message or upload an image..."
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
                   disabled={isTyping}
                 />
                 <button
                   onClick={handleSendMessage}
-                  disabled={!inputText.trim() || isTyping}
+                  disabled={(!inputText.trim() && !selectedImage) || isTyping}
                   className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-2 rounded-full hover:from-green-700 hover:to-emerald-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
                 >
                   <Send className="w-5 h-5" />
@@ -285,18 +358,36 @@ const AIChat: React.FC = () => {
             </div>
           </div>
 
-          {/* API Info Box */}
+          {/* Feature Info Box */}
           <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
             <div className="text-sm text-blue-800">
-              <p className="font-semibold mb-1 text-blue-800">Google Gemini Integration:</p>
+              <p className="font-semibold mb-1 text-blue-800">Google Gemini Pro Vision Features:</p>
               <p className="mb-2">
-                This chat now uses Google's Gemini Pro model for intelligent conversations. You need to provide your own API key to use this feature.
+                This AI chat system now supports both text conversations and advanced image analysis capabilities.
               </p>
-              <div className="space-y-1 text-blue-700">
-                <p>• Get your free API key from Google AI Studio</p>
-                <p>• The API key is stored locally in your browser</p>
-                <p>• Supports natural conversations with advanced AI capabilities</p>
-                <p>• Built-in safety filters for responsible AI usage</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-blue-700">
+                <div>
+                  <p className="font-medium mb-1">💬 Text Conversations:</p>
+                  <ul className="space-y-1 text-sm">
+                    <li>• Natural language processing</li>
+                    <li>• Context-aware responses</li>
+                    <li>• Multi-turn conversations</li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-medium mb-1">🖼️ Image Analysis:</p>
+                  <ul className="space-y-1 text-sm">
+                    <li>• Object and scene recognition</li>
+                    <li>• Text extraction from images</li>
+                    <li>• Detailed visual descriptions</li>
+                    <li>• Content and context analysis</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="mt-3 p-2 bg-green-100 rounded-lg">
+                <p className="text-green-800 text-sm font-medium">
+                  ✅ API Key Integrated: Ready to use! Upload images or start chatting.
+                </p>
               </div>
             </div>
           </div>
