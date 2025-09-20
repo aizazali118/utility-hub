@@ -12,7 +12,7 @@ const AIChat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hello! I'm your AI assistant. How can I help you today?",
+      text: "Hello! I'm your AI assistant powered by Google Gemini. How can I help you today?",
       isBot: true,
       timestamp: new Date()
     }
@@ -31,44 +31,64 @@ const AIChat: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  const callOpenAI = async (message: string): Promise<string> => {
+  const callGeminiAPI = async (message: string): Promise<string> => {
     if (!apiKey) {
-      return "Please provide your OpenAI API key to use the AI chat feature. You can get one from https://platform.openai.com/api-keys";
+      return "Please provide your Google Gemini API key to use the AI chat feature. You can get one from https://makersuite.google.com/app/apikey";
     }
 
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
+          contents: [{
+            parts: [{
+              text: message
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+          },
+          safetySettings: [
             {
-              role: 'system',
-              content: 'You are a helpful assistant. Provide clear, concise, and helpful responses.'
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
             },
             {
-              role: 'user',
-              content: message
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
             }
-          ],
-          max_tokens: 500,
-          temperature: 0.7
+          ]
         })
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'API request failed');
+        throw new Error(errorData.error?.message || `API request failed with status ${response.status}`);
       }
 
       const data = await response.json();
-      return data.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+      
+      if (data.candidates && data.candidates.length > 0 && data.candidates[0].content) {
+        return data.candidates[0].content.parts[0].text || 'Sorry, I could not generate a response.';
+      } else {
+        return 'Sorry, I could not generate a response. Please try again.';
+      }
     } catch (error) {
-      console.error('OpenAI API Error:', error);
+      console.error('Gemini API Error:', error);
       return `Error: ${error instanceof Error ? error.message : 'Failed to get AI response'}. Please check your API key and try again.`;
     }
   };
@@ -88,7 +108,7 @@ const AIChat: React.FC = () => {
     setIsTyping(true);
 
     try {
-      const aiResponse = await callOpenAI(inputText);
+      const aiResponse = await callGeminiAPI(inputText);
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
         text: aiResponse,
@@ -123,7 +143,7 @@ const AIChat: React.FC = () => {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">AI Chat System</h1>
-            <p className="text-gray-600">Have intelligent conversations with AI</p>
+            <p className="text-gray-600">Have intelligent conversations with Google Gemini AI</p>
           </div>
 
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden" style={{ height: '70vh' }}>
@@ -131,11 +151,11 @@ const AIChat: React.FC = () => {
             <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                    <h2 className="text-white font-semibold">AI Assistant (GPT-3.5)</h2>
+                  <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <Sparkles className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-white font-semibold">AI Assistant (Google Gemini)</h2>
                     <p className="text-green-100 text-sm">
                       {apiKey ? 'Connected' : 'API key required'}
                     </p>
@@ -156,7 +176,7 @@ const AIChat: React.FC = () => {
                       type="password"
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="Enter your OpenAI API key..."
+                      placeholder="Enter your Google Gemini API key..."
                       className="flex-1 px-3 py-2 rounded-lg text-gray-900 text-sm"
                     />
                     <button
@@ -167,7 +187,7 @@ const AIChat: React.FC = () => {
                     </button>
                   </div>
                   <p className="text-green-100 text-xs mt-2">
-                    Get your API key from: https://platform.openai.com/api-keys
+                    Get your API key from: https://makersuite.google.com/app/apikey
                   </p>
                 </div>
               )}
@@ -196,7 +216,7 @@ const AIChat: React.FC = () => {
                         ? 'bg-gray-100 text-gray-800'
                         : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
                     }`}>
-                      <p className="text-sm leading-relaxed">{message.text}</p>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
                       <p className={`text-xs mt-1 ${
                         message.isBot ? 'text-gray-500' : 'text-blue-200'
                       }`}>
@@ -251,13 +271,18 @@ const AIChat: React.FC = () => {
           </div>
 
           {/* API Info Box */}
-          <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
             <div className="text-sm text-blue-800">
-              <p className="font-semibold mb-1 text-yellow-800">OpenAI Integration:</p>
-              <p>
-                This chat uses OpenAI's GPT-3.5-turbo model. You need to provide your own API key to use this feature. 
-                The API key is stored locally in your browser and is not sent to our servers.
+              <p className="font-semibold mb-1 text-blue-800">Google Gemini Integration:</p>
+              <p className="mb-2">
+                This chat now uses Google's Gemini Pro model for intelligent conversations. You need to provide your own API key to use this feature.
               </p>
+              <div className="space-y-1 text-blue-700">
+                <p>• Get your free API key from Google AI Studio</p>
+                <p>• The API key is stored locally in your browser</p>
+                <p>• Supports natural conversations with advanced AI capabilities</p>
+                <p>• Built-in safety filters for responsible AI usage</p>
+              </div>
             </div>
           </div>
         </div>
