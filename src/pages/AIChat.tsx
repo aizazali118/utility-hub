@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles } from 'lucide-react';
+import { security } from '../utils/security';
 
 interface Message {
   id: string;
@@ -19,7 +20,10 @@ const AIChat: React.FC = () => {
   ]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState(() => {
+    const stored = localStorage.getItem('gemini_api_key');
+    return stored ? security.decryptApiKey(stored) : '';
+  });
   const [showApiInput, setShowApiInput] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -27,6 +31,15 @@ const AIChat: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Save API key securely
+  const saveApiKey = (key: string) => {
+    setApiKey(key);
+    if (key) {
+      localStorage.setItem('gemini_api_key', security.encryptApiKey(key));
+    } else {
+      localStorage.removeItem('gemini_api_key');
+    }
+  };
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -175,9 +188,11 @@ const AIChat: React.FC = () => {
                     <input
                       type="password"
                       value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
+                      onChange={(e) => saveApiKey(e.target.value)}
                       placeholder="Enter your Google Gemini API key..."
                       className="flex-1 px-3 py-2 rounded-lg text-gray-900 text-sm"
+                      autoComplete="off"
+                      spellCheck="false"
                     />
                     <button
                       onClick={() => setShowApiInput(false)}
