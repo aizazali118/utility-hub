@@ -21,7 +21,6 @@ const Header: React.FC<HeaderProps> = ({ isMobileMenuOpen, setIsMobileMenuOpen }
             <Link to="/" className="text-gray-700 hover:text-blue-600 transition-colors">Home</Link>
             <Link to="/qr-generator" className="text-gray-700 hover:text-blue-600 transition-colors">QR Generator</Link>
             <Link to="/pdf-tools" className="text-gray-700 hover:text-blue-600 transition-colors">PDF Tools</Link>
-            <Link to="/ai-chat" className="text-gray-700 hover:text-blue-600 transition-colors">AI Chat</Link>
             <Link to="/image-resizer" className="text-gray-700 hover:text-blue-600 transition-colors">Image Resizer</Link>
           </nav>
 
@@ -41,7 +40,6 @@ const Header: React.FC<HeaderProps> = ({ isMobileMenuOpen, setIsMobileMenuOpen }
               <Link to="/" className="text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
               <Link to="/qr-generator" className="text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>QR Generator</Link>
               <Link to="/pdf-tools" className="text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>PDF Tools</Link>
-              <Link to="/ai-chat" className="text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>AI Chat</Link>
               <Link to="/image-resizer" className="text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Image Resizer</Link>
             </div>
           </nav>

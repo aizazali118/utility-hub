@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { QrCode, FileText, MessageSquare, ImageIcon, ArrowRight } from 'lucide-react';
+import { QrCode, FileText, ImageIcon, ArrowRight } from 'lucide-react';
 
 const Home: React.FC = () => {
   const features = [
@@ -17,13 +17,6 @@ const Home: React.FC = () => {
       description: 'Convert between PDF, Word, and images. Complete document conversion suite.',
       path: '/pdf-tools',
       color: 'from-purple-500 to-pink-500'
-    },
-    {
-      icon: MessageSquare,
-      title: 'AI Chat System',
-      description: 'Intelligent chat interface powered by AI for questions and assistance.',
-      path: '/ai-chat',
-      color: 'from-green-500 to-emerald-500'
     },
     {
       icon: ImageIcon,
@@ -51,6 +44,7 @@ const Home: React.FC = () => {
 
         {/* Features Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
@@ -83,8 +77,9 @@ const Home: React.FC = () => {
         {/* Stats Section */}
         <section className="mt-20 bg-white rounded-3xl p-8 shadow-lg">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
             <div>
-              <h3 className="text-3xl font-bold text-blue-600 mb-2">4</h3>
+              <h3 className="text-3xl font-bold text-blue-600 mb-2">3</h3>
               <p className="text-gray-600">Powerful Tools</p>
             </div>
             <div>
@@ -94,10 +89,6 @@ const Home: React.FC = () => {
             <div>
               <h3 className="text-3xl font-bold text-green-600 mb-2">24/7</h3>
               <p className="text-gray-600">Available</p>
-            </div>
-            <div>
-              <h3 className="text-3xl font-bold text-orange-600 mb-2">∞</h3>
-              <p className="text-gray-600">Possibilities</p>
             </div>
           </div>
         </section>

@@ -5,7 +5,6 @@ import Footer from './components/Footer';
 import Home from './pages/Home';
 import QRGenerator from './pages/QRGenerator';
 import PDFTools from './pages/PDFTools';
-import AIChat from './pages/AIChat';
 import ImageResizer from './pages/ImageResizer';
 
 function App() {
@@ -24,7 +23,6 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/qr-generator" element={<QRGenerator />} />
             <Route path="/pdf-tools" element={<PDFTools />} />
-            <Route path="/ai-chat" element={<AIChat />} />
             <Route path="/image-resizer" element={<ImageResizer />} />
           </Routes>
         </main>
