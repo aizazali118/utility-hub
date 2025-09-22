@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload, Download, Image as ImageIcon, Settings, Zap, X, Plus } from 'lucide-react';
+import JSZip from 'jszip';
 
 interface ImageData {
   id: string;
@@ -197,6 +198,47 @@ const ImageResizer: React.FC = () => {
         }, index * 100); // Stagger downloads
       }
     });
+  };
+
+  const downloadAllAsZip = async () => {
+    const processedImages = images.filter(img => img.processedUrl);
+    if (processedImages.length === 0) return;
+
+    try {
+      const zip = new JSZip();
+      
+      // Add each processed image to the ZIP
+      for (let i = 0; i < processedImages.length; i++) {
+        const imageData = processedImages[i];
+        if (imageData.processedUrl) {
+          // Convert data URL to blob
+          const response = await fetch(imageData.processedUrl);
+          const blob = await response.blob();
+          
+          // Generate filename
+          const fileName = imageData.file.name.split('.')[0];
+          const zipFileName = `${fileName}_resized.${outputFormat}`;
+          
+          // Add to ZIP
+          zip.file(zipFileName, blob);
+        }
+      }
+      
+      // Generate ZIP file
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      
+      // Download ZIP
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(zipBlob);
+      link.download = `resized_images_${new Date().toISOString().split('T')[0]}.zip`;
+      link.click();
+      
+      // Clean up
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      console.error('Error creating ZIP file:', error);
+      alert('Failed to create ZIP file. Please try downloading images individually.');
+    }
   };
 
   const resetImages = () => {
@@ -453,13 +495,25 @@ const ImageResizer: React.FC = () => {
 
                 {/* Download All Button */}
                 {hasProcessedImages && (
-                  <button
-                    onClick={downloadAllImages}
-                    className="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2"
-                  >
-                    <Download className="w-5 h-5" />
-                    <span>Download All Processed</span>
-                  </button>
+                  <div className="space-y-3">
+                    {bulkMode ? (
+                      <button
+                        onClick={downloadAllAsZip}
+                        className="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2"
+                      >
+                        <Download className="w-5 h-5" />
+                        <span>Download All as ZIP</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={downloadAllImages}
+                        className="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2"
+                      >
+                        <Download className="w-5 h-5" />
+                        <span>Download All Processed</span>
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
