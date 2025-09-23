@@ -22,6 +22,7 @@ const Header: React.FC<HeaderProps> = ({ isMobileMenuOpen, setIsMobileMenuOpen }
             <Link to="/qr-generator" className="text-gray-700 hover:text-blue-600 transition-colors">QR Generator</Link>
             <Link to="/pdf-tools" className="text-gray-700 hover:text-blue-600 transition-colors">PDF Tools</Link>
             <Link to="/image-resizer" className="text-gray-700 hover:text-blue-600 transition-colors">Image Resizer</Link>
+            <Link to="/image-to-text" className="text-gray-700 hover:text-blue-600 transition-colors">Image to Text</Link>
           </nav>
 
           {/* Mobile Menu Button */}
@@ -41,6 +42,7 @@ const Header: React.FC<HeaderProps> = ({ isMobileMenuOpen, setIsMobileMenuOpen }
               <Link to="/qr-generator" className="text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>QR Generator</Link>
               <Link to="/pdf-tools" className="text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>PDF Tools</Link>
               <Link to="/image-resizer" className="text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Image Resizer</Link>
+              <Link to="/image-to-text" className="text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Image to Text</Link>
             </div>
           </nav>
         )}

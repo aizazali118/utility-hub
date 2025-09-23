@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import QRGenerator from './pages/QRGenerator';
 import PDFTools from './pages/PDFTools';
 import ImageResizer from './pages/ImageResizer';
+import ImageToText from './pages/ImageToText';
 
 function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -24,6 +25,7 @@ function App() {
             <Route path="/qr-generator" element={<QRGenerator />} />
             <Route path="/pdf-tools" element={<PDFTools />} />
             <Route path="/image-resizer" element={<ImageResizer />} />
+            <Route path="/image-to-text" element={<ImageToText />} />
           </Routes>
         </main>
         
