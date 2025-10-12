@@ -4,8 +4,9 @@ import { jsPDF } from 'jspdf';
 import { PDFDocument } from 'pdf-lib';
 import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const PDFTools: React.FC = () => {
   const [activeTab, setActiveTab] = useState('any-to-pdf');
