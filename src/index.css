@@ -13,7 +13,7 @@
     -ms-user-select: none;
     user-select: none;
   }
-  
+
   /* Allow selection for input elements */
   input, textarea, [contenteditable="true"] {
     -webkit-user-select: text;
@@ -21,10 +21,29 @@
     -ms-user-select: text;
     user-select: text;
   }
-  
-  /* Hide scrollbars in development tools detection */
-  ::-webkit-scrollbar {
-    width: 0px;
-    background: transparent;
-  }
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #5568d3 0%, #63408a 100%);
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
 }
