@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Upload, Download, FileText, Image, AlertCircle, File, FileImage } from 'lucide-react';
-import { jsPDF } from 'jspdf';
+import jsPDF from 'jspdf';
 import { PDFDocument } from 'pdf-lib';
 import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
