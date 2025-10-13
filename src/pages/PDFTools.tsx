@@ -11,6 +11,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 const PDFTools: React.FC = () => {
   const [activeTab, setActiveTab] = useState('any-to-pdf');
   const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string>('');
@@ -25,15 +26,23 @@ const PDFTools: React.FC = () => {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      setFile(files[0]);
+    const droppedFiles = e.dataTransfer.files;
+    if (droppedFiles.length > 0) {
+      if (activeTab === 'pdf-merge') {
+        setFiles(Array.from(droppedFiles));
+      } else {
+        setFile(droppedFiles[0]);
+      }
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0]);
+      if (activeTab === 'pdf-merge') {
+        setFiles(Array.from(e.target.files));
+      } else {
+        setFile(e.target.files[0]);
+      }
     }
   };
 
@@ -174,6 +183,31 @@ const PDFTools: React.FC = () => {
     });
   };
 
+  const mergePDFs = async (pdfFiles: File[]): Promise<string> => {
+    try {
+      setConversionStatus('Loading PDF files...');
+      const mergedPdf = await PDFDocument.create();
+
+      for (let i = 0; i < pdfFiles.length; i++) {
+        setConversionStatus(`Processing PDF ${i + 1} of ${pdfFiles.length}...`);
+        const pdfBytes = await pdfFiles[i].arrayBuffer();
+        const pdf = await PDFDocument.load(pdfBytes);
+        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+        copiedPages.forEach((page) => {
+          mergedPdf.addPage(page);
+        });
+      }
+
+      setConversionStatus('Finalizing merged PDF...');
+      const mergedPdfBytes = await mergedPdf.save();
+      const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+      return URL.createObjectURL(blob);
+    } catch (error) {
+      console.error('PDF merge error:', error);
+      throw new Error('Failed to merge PDFs. Please ensure all files are valid PDFs.');
+    }
+  };
+
   const convertPDFToImage = async (pdfFile: File): Promise<string> => {
     try {
       setConversionStatus('Loading PDF...');
@@ -256,13 +290,11 @@ const PDFTools: React.FC = () => {
           throw new Error('Please select a PDF file for PDF to Image conversion');
         }
       } else if (activeTab === 'pdf-merge') {
-        const pdf = new jsPDF();
-        pdf.text('PDF Merge Feature', 20, 20);
-        pdf.text(`File: ${file.name}`, 20, 40);
-        pdf.text('This feature will merge multiple PDFs when implemented.', 20, 60);
+        if (files.length < 2) {
+          throw new Error('Please select at least 2 PDF files to merge');
+        }
 
-        const pdfBlob = pdf.output('blob');
-        resultUrl = URL.createObjectURL(pdfBlob);
+        resultUrl = await mergePDFs(files);
       }
 
       setDownloadUrl(resultUrl);
@@ -276,25 +308,29 @@ const PDFTools: React.FC = () => {
   };
 
   const downloadFile = () => {
-    if (!downloadUrl || !file) return;
+    if (!downloadUrl) return;
 
     const link = document.createElement('a');
     link.href = downloadUrl;
 
-    let fileName = file.name.split('.')[0];
+    let fileName = '';
     let extension = '';
 
     switch (activeTab) {
       case 'any-to-pdf':
+        fileName = file ? file.name.split('.')[0] : 'converted';
         extension = '.pdf';
         break;
       case 'pdf-to-image':
+        fileName = file ? file.name.split('.')[0] : 'converted';
         extension = '.png';
         break;
       case 'pdf-merge':
+        fileName = 'merged';
         extension = '.pdf';
         break;
       default:
+        fileName = 'converted';
         extension = '.pdf';
     }
 
@@ -360,6 +396,7 @@ const PDFTools: React.FC = () => {
                     onClick={() => {
                       setActiveTab(tab.id);
                       setFile(null);
+                      setFiles([]);
                       setDownloadUrl('');
                       setConversionStatus('');
                     }}
@@ -395,12 +432,38 @@ const PDFTools: React.FC = () => {
               className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 ${
                 dragOver
                   ? 'border-blue-400 bg-blue-50'
-                  : file
+                  : (file || files.length > 0)
                     ? 'border-green-400 bg-green-50'
                     : 'border-gray-300 hover:border-blue-400'
               }`}
             >
-              {file ? (
+              {(activeTab === 'pdf-merge' && files.length > 0) ? (
+                <div className="space-y-4">
+                  <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+                    <FileText className="w-8 h-8 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">{files.length} PDF files selected</p>
+                    <div className="mt-2 max-h-40 overflow-y-auto">
+                      {files.map((f, idx) => (
+                        <p key={idx} className="text-sm text-gray-500">
+                          {idx + 1}. {f.name} ({(f.size / 1024 / 1024).toFixed(2)} MB)
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setFiles([]);
+                      setDownloadUrl('');
+                      setConversionStatus('');
+                    }}
+                    className="text-red-600 hover:text-red-700 text-sm font-medium"
+                  >
+                    Remove all files
+                  </button>
+                </div>
+              ) : file ? (
                 <div className="space-y-4">
                   <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
                     <FileText className="w-8 h-8 text-green-600" />
@@ -437,6 +500,7 @@ const PDFTools: React.FC = () => {
                     type="file"
                     onChange={handleFileChange}
                     accept={getAcceptedFormats()}
+                    multiple={activeTab === 'pdf-merge'}
                     className="hidden"
                     id="file-upload"
                   />
@@ -456,7 +520,7 @@ const PDFTools: React.FC = () => {
               </div>
             )}
 
-            {file && (
+            {(file || files.length > 0) && (
               <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
                 <button
                   onClick={handleConversion}

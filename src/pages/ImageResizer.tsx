@@ -8,16 +8,15 @@ interface ImageData {
   url: string;
   width: number;
   height: number;
+  targetWidth?: number;
+  targetHeight?: number;
   processedUrl?: string;
 }
 
 const ImageResizer: React.FC = () => {
   const [images, setImages] = useState<ImageData[]>([]);
-  const [newWidth, setNewWidth] = useState<number>(0);
-  const [newHeight, setNewHeight] = useState<number>(0);
   const [quality, setQuality] = useState<number>(90);
   const [outputFormat, setOutputFormat] = useState<string>('jpeg');
-  const [maintainAspectRatio, setMaintainAspectRatio] = useState<boolean>(true);
   const [processing, setProcessing] = useState<boolean>(false);
   const [bulkMode, setBulkMode] = useState<boolean>(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -70,16 +69,12 @@ const ImageResizer: React.FC = () => {
         file,
         url,
         width: img.width,
-        height: img.height
+        height: img.height,
+        targetWidth: img.width,
+        targetHeight: img.height
       };
-      
+
       setImages(prev => [...prev, imageData]);
-      
-      // Set dimensions based on first image if not set
-      if (newWidth === 0 && newHeight === 0) {
-        setNewWidth(img.width);
-        setNewHeight(img.height);
-      }
     };
     
     img.src = url;
@@ -89,41 +84,49 @@ const ImageResizer: React.FC = () => {
     setImages(prev => prev.filter(img => img.id !== id));
   };
 
-  const handleWidthChange = (width: number) => {
-    setNewWidth(width);
-    if (maintainAspectRatio && images.length > 0) {
-      const firstImage = images[0];
-      const aspectRatio = firstImage.height / firstImage.width;
-      setNewHeight(Math.round(width * aspectRatio));
-    }
-  };
+  const updateImageDimensions = (imageId: string, width?: number, height?: number) => {
+    setImages(prev => prev.map(img => {
+      if (img.id === imageId) {
+        const aspectRatio = img.height / img.width;
+        let newWidth = width ?? img.targetWidth ?? img.width;
+        let newHeight = height ?? img.targetHeight ?? img.height;
 
-  const handleHeightChange = (height: number) => {
-    setNewHeight(height);
-    if (maintainAspectRatio && images.length > 0) {
-      const firstImage = images[0];
-      const aspectRatio = firstImage.width / firstImage.height;
-      setNewWidth(Math.round(height * aspectRatio));
-    }
+        if (width !== undefined && height === undefined) {
+          newHeight = Math.round(width * aspectRatio);
+        } else if (height !== undefined && width === undefined) {
+          newWidth = Math.round(height / aspectRatio);
+        }
+
+        return {
+          ...img,
+          targetWidth: newWidth,
+          targetHeight: newHeight
+        };
+      }
+      return img;
+    }));
   };
 
   const processImage = async (imageData: ImageData): Promise<string> => {
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      
+
       if (!ctx) {
         reject(new Error('Canvas context not available'));
         return;
       }
 
-      canvas.width = newWidth;
-      canvas.height = newHeight;
+      const targetWidth = imageData.targetWidth ?? imageData.width;
+      const targetHeight = imageData.targetHeight ?? imageData.height;
+
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
 
       const img = new Image();
       img.onload = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, newWidth, newHeight);
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
         
         let format = 'image/jpeg';
         let qualityValue = quality / 100;
@@ -368,6 +371,11 @@ const ImageResizer: React.FC = () => {
                           <div className="absolute top-2 right-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
                             {imageData.width} × {imageData.height}
                           </div>
+                          {imageData.processedUrl && (
+                            <div className="absolute bottom-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs">
+                              {imageData.targetWidth} × {imageData.targetHeight}
+                            </div>
+                          )}
                           <button
                             onClick={() => removeImage(imageData.id)}
                             className="absolute top-2 left-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -407,42 +415,35 @@ const ImageResizer: React.FC = () => {
               </h2>
 
               <div className="space-y-6">
-                {/* Dimensions */}
-                <div>
-                  <h3 className="font-semibold mb-3">Dimensions</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Width (px)</label>
-                      <input
-                        type="number"
-                        value={newWidth}
-                        onChange={(e) => handleWidthChange(Number(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                        disabled={images.length === 0}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Height (px)</label>
-                      <input
-                        type="number"
-                        value={newHeight}
-                        onChange={(e) => handleHeightChange(Number(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                        disabled={images.length === 0}
-                      />
+                {/* Dimensions - only show in single mode */}
+                {!bulkMode && images.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold mb-3">Dimensions</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Width (px)</label>
+                        <input
+                          type="number"
+                          value={images[0]?.targetWidth ?? images[0]?.width ?? 0}
+                          onChange={(e) => updateImageDimensions(images[0].id, Number(e.target.value), undefined)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Height (px)</label>
+                        <input
+                          type="number"
+                          value={images[0]?.targetHeight ?? images[0]?.height ?? 0}
+                          onChange={(e) => updateImageDimensions(images[0].id, undefined, Number(e.target.value))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Original: {images[0]?.width} × {images[0]?.height} px
+                      </div>
                     </div>
                   </div>
-                  <label className="flex items-center mt-3">
-                    <input
-                      type="checkbox"
-                      checked={maintainAspectRatio}
-                      onChange={(e) => setMaintainAspectRatio(e.target.checked)}
-                      className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                      disabled={images.length === 0}
-                    />
-                    <span className="ml-2 text-sm text-gray-700">Maintain aspect ratio</span>
-                  </label>
-                </div>
+                )}
 
                 {/* Output Format */}
                 <div>
@@ -533,7 +534,7 @@ const ImageResizer: React.FC = () => {
                         className="w-full h-48 object-cover rounded-xl border"
                       />
                       <div className="absolute top-2 right-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
-                        {newWidth} × {newHeight}
+                        {imageData.targetWidth} × {imageData.targetHeight}
                       </div>
                     </div>
                     <div className="text-center">
