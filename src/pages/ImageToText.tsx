@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Download, FileText, Table, Image as ImageIcon, Eye, FileSpreadsheet, AlertCircle, Loader, Settings } from 'lucide-react';
+import { Upload, Download, FileText, Table, Image as ImageIcon, Eye, FileSpreadsheet, AlertCircle, Loader, Settings, Copy, Check } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import * as XLSX from 'xlsx';
 
@@ -21,6 +21,7 @@ const ImageToText: React.FC = () => {
   const [imageEnhancement, setImageEnhancement] = useState(true);
   const [contrastLevel, setContrastLevel] = useState(1.5);
   const [brightnessLevel, setBrightnessLevel] = useState(1.2);
+  const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -332,75 +333,41 @@ const ImageToText: React.FC = () => {
     if (!extractedData?.tableData) return;
 
     try {
-      // Create a new workbook
       const workbook = XLSX.utils.book_new();
-      
-      // Convert table data to worksheet
       const worksheet = XLSX.utils.aoa_to_sheet(extractedData.tableData);
-      
-      // Auto-size columns
+
       const colWidths = extractedData.tableData[0]?.map((_, colIndex) => {
         const maxLength = Math.max(
-          ...extractedData.tableData!.map(row => 
+          ...extractedData.tableData!.map(row =>
             row[colIndex] ? row[colIndex].toString().length : 0
           )
         );
         return { wch: Math.min(Math.max(maxLength + 2, 10), 50) };
       }) || [];
-      
+
       worksheet['!cols'] = colWidths;
-      
-      // Add some basic styling
-      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-      
-      // Style header row if it exists
-      if (extractedData.tableData.length > 0) {
-        for (let col = range.s.c; col <= range.e.c; col++) {
-          const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
-          if (worksheet[cellAddress]) {
-            worksheet[cellAddress].s = {
-              font: { bold: true },
-              fill: { fgColor: { rgb: "E6E6FA" } },
-              border: {
-                top: { style: 'thin', color: { rgb: "000000" } },
-                bottom: { style: 'thin', color: { rgb: "000000" } },
-                left: { style: 'thin', color: { rgb: "000000" } },
-                right: { style: 'thin', color: { rgb: "000000" } }
-              }
-            };
-          }
-        }
-      }
-      
-      // Add borders to all cells
-      for (let row = range.s.r; row <= range.e.r; row++) {
-        for (let col = range.s.c; col <= range.e.c; col++) {
-          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-          if (worksheet[cellAddress]) {
-            if (!worksheet[cellAddress].s) worksheet[cellAddress].s = {};
-            worksheet[cellAddress].s.border = {
-              top: { style: 'thin', color: { rgb: "CCCCCC" } },
-              bottom: { style: 'thin', color: { rgb: "CCCCCC" } },
-              left: { style: 'thin', color: { rgb: "CCCCCC" } },
-              right: { style: 'thin', color: { rgb: "CCCCCC" } }
-            };
-          }
-        }
-      }
-      
-      // Add worksheet to workbook
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Extracted Data');
-      
-      // Generate filename
+
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `extracted_table_${timestamp}.xlsx`;
-      
-      // Write file
+
       XLSX.writeFile(workbook, filename);
-      
     } catch (error) {
       console.error('Excel export error:', error);
       alert('Failed to create Excel file. Please try again.');
+    }
+  };
+
+  const copyToClipboard = async () => {
+    if (!extractedData?.text) return;
+
+    try {
+      await navigator.clipboard.writeText(extractedData.text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Copy failed:', error);
+      alert('Failed to copy text to clipboard');
     }
   };
 
@@ -645,6 +612,36 @@ const ImageToText: React.FC = () => {
                       </span>
                     </div>
                   </div>
+
+                  {/* Text Display with Copy Button */}
+                  {extractedData.text && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-gray-900">Extracted Text:</h3>
+                        <button
+                          onClick={copyToClipboard}
+                          className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm font-medium"
+                        >
+                          {copied ? (
+                            <>
+                              <Check className="w-4 h-4 text-green-600" />
+                              <span className="text-green-600">Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-4 h-4" />
+                              <span>Copy Text</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="border rounded-lg p-4 bg-gray-50 max-h-48 overflow-y-auto">
+                        <pre className="text-sm text-gray-800 whitespace-pre-wrap font-['Inter',_'Manrope',_system-ui,_sans-serif]">
+                          {extractedData.text}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Table Preview */}
                   {extractionType === 'table' && extractedData.tableData && (

@@ -247,7 +247,11 @@ const PDFTools: React.FC = () => {
   };
 
   const handleConversion = async () => {
-    if (!file) return;
+    if (!file && files.length === 0) return;
+    if (activeTab === 'pdf-merge' && files.length < 2) {
+      alert('Please select at least 2 PDF files to merge');
+      return;
+    }
 
     setProcessing(true);
     setDownloadUrl('');
