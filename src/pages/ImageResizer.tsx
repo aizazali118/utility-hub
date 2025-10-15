@@ -119,6 +119,8 @@ const ImageResizer: React.FC = () => {
 
       const targetWidth = imageData.targetWidth ?? imageData.width;
       const targetHeight = imageData.targetHeight ?? imageData.height;
+      const originalSizeMB = imageData.file.size / 1024 / 1024;
+      const targetSizeKB = 50;
 
       canvas.width = targetWidth;
       canvas.height = targetHeight;
@@ -127,10 +129,10 @@ const ImageResizer: React.FC = () => {
       img.onload = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-        
+
         let format = 'image/jpeg';
         let qualityValue = quality / 100;
-        
+
         switch (outputFormat) {
           case 'png':
             format = 'image/png';
@@ -145,19 +147,72 @@ const ImageResizer: React.FC = () => {
           default:
             format = 'image/jpeg';
         }
-        
+
         try {
-          const processedDataUrl = canvas.toDataURL(format, qualityValue);
-          resolve(processedDataUrl);
+          // If image is over 1MB, apply smart compression to reach ~50KB
+          if (originalSizeMB > 1) {
+            compressToTargetSize(
+              canvas,
+              format,
+              targetSizeKB,
+              qualityValue
+            ).then(resolve).catch(reject);
+          } else {
+            const processedDataUrl = canvas.toDataURL(format, qualityValue);
+            resolve(processedDataUrl);
+          }
         } catch (error) {
           // Fallback to JPEG if format not supported
-          const fallbackDataUrl = canvas.toDataURL('image/jpeg', quality / 100);
-          resolve(fallbackDataUrl);
+          if (originalSizeMB > 1) {
+            compressToTargetSize(
+              canvas,
+              'image/jpeg',
+              targetSizeKB,
+              qualityValue
+            ).then(resolve).catch(reject);
+          } else {
+            const fallbackDataUrl = canvas.toDataURL('image/jpeg', quality / 100);
+            resolve(fallbackDataUrl);
+          }
         }
       };
-      
+
       img.onerror = () => reject(new Error('Failed to load image'));
       img.src = imageData.url;
+    });
+  };
+
+  const compressToTargetSize = async (
+    canvas: HTMLCanvasElement,
+    format: string,
+    targetSizeKB: number,
+    initialQuality: number
+  ): Promise<string> => {
+    return new Promise((resolve) => {
+      let currentQuality = Math.min(initialQuality, 0.85); // Start at max 85%
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      const tryCompress = () => {
+        const dataUrl = canvas.toDataURL(format, currentQuality);
+        const sizeKB = (dataUrl.length * 0.75) / 1024; // Approximate size in KB
+
+        // If size is close to target (within 10KB margin) or we've tried enough times
+        if (sizeKB <= targetSizeKB + 10 || attempts >= maxAttempts || currentQuality <= 0.1) {
+          resolve(dataUrl);
+          return;
+        }
+
+        // Calculate new quality based on size ratio
+        const ratio = targetSizeKB / sizeKB;
+        currentQuality = Math.max(currentQuality * ratio * 0.9, 0.1);
+        attempts++;
+
+        // Try again with adjusted quality
+        setTimeout(tryCompress, 0);
+      };
+
+      tryCompress();
     });
   };
 
