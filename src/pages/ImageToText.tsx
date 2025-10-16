@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Upload, Download, FileText, Table, Image as ImageIcon, Eye, FileSpreadsheet, AlertCircle, Loader, Settings, Copy, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Upload, Download, FileText, Table, Image as ImageIcon, Eye, FileSpreadsheet, AlertCircle, Loader, Settings, Copy, Check, Clipboard } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import * as XLSX from 'xlsx';
 
@@ -24,6 +24,28 @@ const ImageToText: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pasteAreaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          e.preventDefault();
+          const blob = items[i].getAsFile();
+          if (blob) {
+            handleImageSelect(blob);
+          }
+          break;
+        }
+      }
+    };
+
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, []);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -46,6 +68,25 @@ const ImageToText: React.FC = () => {
     setImageUrl(url);
     setExtractedData(null);
     setProcessedImageUrl('');
+  };
+
+  const handlePasteClick = async () => {
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const item of clipboardItems) {
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            const blob = await item.getType(type);
+            handleImageSelect(new File([blob], 'pasted-image.png', { type }));
+            return;
+          }
+        }
+      }
+      alert('No image found in clipboard. Please copy an image first.');
+    } catch (error) {
+      console.error('Paste error:', error);
+      alert('Failed to paste image. Please try drag & drop or file upload instead.');
+    }
   };
 
   const enhanceImage = async (imageFile: File): Promise<string> => {
@@ -440,29 +481,54 @@ const ImageToText: React.FC = () => {
               </h2>
 
               {!image ? (
-                <div
-                  onDrop={handleDrop}
-                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                  onDragLeave={() => setDragOver(false)}
-                  className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${
-                    dragOver ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-green-400'
-                  }`}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <ImageIcon className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                  <p className="text-lg font-semibold text-gray-700 mb-2">
-                    Drop image here or click to browse
-                  </p>
-                  <p className="text-gray-500 text-sm">
-                    Supports: JPG, PNG, GIF, BMP, WebP, TIFF
-                  </p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
+                <div className="space-y-4">
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer ${
+                      dragOver ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-green-400'
+                    }`}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <ImageIcon className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                    <p className="text-lg font-semibold text-gray-700 mb-2">
+                      Drop image here or click to browse
+                    </p>
+                    <p className="text-gray-500 text-sm">
+                      Supports: JPG, PNG, GIF, BMP, WebP, TIFF
+                    </p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-white text-gray-500">or</span>
+                    </div>
+                  </div>
+
+                  <button
+                    ref={pasteAreaRef}
+                    onClick={handlePasteClick}
+                    className="w-full border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center transition-colors hover:border-green-400 hover:bg-green-50 group"
+                  >
+                    <Clipboard className="w-12 h-12 mx-auto text-gray-400 group-hover:text-green-600 mb-3 transition-colors" />
+                    <p className="text-lg font-semibold text-gray-700 mb-1">
+                      Paste Image from Clipboard
+                    </p>
+                    <p className="text-gray-500 text-sm">
+                      Copy an image and click here, or press Ctrl+V / Cmd+V anywhere
+                    </p>
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-4">
